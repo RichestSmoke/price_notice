@@ -1,5 +1,3 @@
-from typing import Any
-
 from binance.um_futures import UMFutures
 from binance.error import ClientError
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
@@ -119,7 +117,7 @@ def new_stop_order(symbol, side, stop_price) -> int:
         return None
 
 
-def new_take_profit_order(symbol, side, quantity, take_price, take_price_trigger) -> Any | None:
+def new_take_profit_order(symbol, side, quantity, take_price, take_price_trigger) ->  int:
     try:
         response = client.new_order(
             symbol=symbol,
