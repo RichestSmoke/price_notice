@@ -13,7 +13,7 @@ WEB_SERVER_HOST = "::"
 WEB_SERVER_PORT = 8443
 WEBHOOK_PATH = "/webhook"
 BASE_WEBHOOK_URL = "https://botrealestateod.alwaysdata.net"
-
+# BASE_WEBHOOK_URL = "https://4699-188-115-145-71.ngrok.io"
 load_dotenv(find_dotenv())
 
 bot = Bot(os.getenv('TG_TOKEN'), parse_mode=ParseMode.HTML)
