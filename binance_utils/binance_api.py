@@ -3,6 +3,7 @@ from binance.error import ClientError
 from binance.websocket.um_futures.websocket_client import UMFuturesWebsocketClient
 from binance.lib.utils import config_logging
 from dotenv import load_dotenv, find_dotenv
+from typing import Optional
 import requests
 import os
 import logging
@@ -47,7 +48,7 @@ def get_filters_exchange_info() -> dict:
 TRADE_FILTERS = get_filters_exchange_info()
 
 
-def new_order_limit(symbol: str, side: str, quantity: float, price: float) -> int | None:
+def new_order_limit(symbol: str, side: str, quantity: float, price: float) -> Optional[int]:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -77,7 +78,7 @@ def new_order_limit(symbol: str, side: str, quantity: float, price: float) -> in
         return None
 
 
-def new_order_market(symbol: str, side: str, quantity: float) -> int | None:
+def new_order_market(symbol: str, side: str, quantity: float) -> Optional[int]:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -105,7 +106,7 @@ def new_order_market(symbol: str, side: str, quantity: float) -> int | None:
         return None
 
 
-def new_stop_order(symbol: str, side: str, stop_price: float) -> int | None:
+def new_stop_order(symbol: str, side: str, stop_price: float) -> Optional[int]:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -138,7 +139,7 @@ def new_stop_order(symbol: str, side: str, stop_price: float) -> int | None:
 def new_take_profit_order(
     symbol: str, side: str, quantity: float, 
     take_price: float, take_price_trigger: float
-) ->  int | None:
+) ->  Optional[int]:
     try:
         response = client.new_order(
             symbol=symbol,
