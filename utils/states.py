@@ -9,3 +9,7 @@ class DeleteNoticeState(StatesGroup):
     order_del = State()
     coin_del = State()
     db_del = State()
+
+
+class ConficTradeState(StatesGroup):
+    start = State()

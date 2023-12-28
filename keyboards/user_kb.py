@@ -16,7 +16,8 @@ main_kb = ReplyKeyboardMarkup(
             KeyboardButton(text="Удалить ордеры")
         ],
         [
-            KeyboardButton(text="Мониторинг")
+            KeyboardButton(text="Мониторинг"),
+            KeyboardButton(text="Config")
         ]
     ],
     resize_keyboard=True

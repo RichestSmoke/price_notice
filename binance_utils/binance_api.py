@@ -12,6 +12,12 @@ import time
 
 load_dotenv(find_dotenv())
 # config_logging(logging, logging.INFO, 'app.log')
+logging.basicConfig(
+        filename="log_file.log",
+        style='{',
+        format='{levelname} ({asctime}): {message} (Line: {lineno}) [{filename}]',
+        level=logging.INFO, 
+    )
 
 
 def send_telegram_message(message: str, chat_id=425136998) -> None:
@@ -41,7 +47,7 @@ def get_filters_exchange_info() -> dict:
 TRADE_FILTERS = get_filters_exchange_info()
 
 
-def new_order_limit(symbol, side, quantity, price) -> int:
+def new_order_limit(symbol: str, side: str, quantity: float, price: float) -> int | None:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -51,7 +57,10 @@ def new_order_limit(symbol, side, quantity, price) -> int:
             price=price,
             timeInForce='GTC'
         )
-        logging.info(response)
+        logging.info(
+            f"new_order_limit: GOOD! orderId: {response['orderId']}, "
+            f"params: symbol={symbol}, side={side}, quantity={quantity}, price={price}"
+        )
         return response['orderId']
 
     except ClientError as e:
@@ -61,13 +70,14 @@ def new_order_limit(symbol, side, quantity, price) -> int:
             f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
         logging.error(
-            f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
+            f"new_order_limit, params: symbol={symbol}, side={side}, quantity={quantity}, price={price}\n"
+            f"      Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
         send_telegram_message(message)
         return None
 
 
-def new_order_market(symbol, side, quantity) -> int:
+def new_order_market(symbol: str, side: str, quantity: float) -> int | None:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -75,7 +85,10 @@ def new_order_market(symbol, side, quantity) -> int:
             type='MARKET',
             quantity=quantity,
         )
-        logging.info(response)
+        logging.info(
+            f"new_order_market: GOOD! orderId: {response['orderId']}, "
+            f"params: symbol={symbol}, side={side}, quantity={quantity}"
+        )
         return response['orderId']
 
     except ClientError as e:
@@ -85,13 +98,14 @@ def new_order_market(symbol, side, quantity) -> int:
             f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
         logging.error(
-            f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
+            f"new_order_market, params: symbol={symbol}, side={side}, quantity={quantity}\n"
+            f"      Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
         send_telegram_message(message)
         return None
 
 
-def new_stop_order(symbol, side, stop_price) -> int:
+def new_stop_order(symbol: str, side: str, stop_price: float) -> int | None:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -101,7 +115,10 @@ def new_stop_order(symbol, side, stop_price) -> int:
             closePosition='true',
             timeInForce = 'GTE_GTC'
         )
-        logging.info(response)
+        logging.info(
+            f"new_stop_order: GOOD! orderId: {response['orderId']}, "
+            f"params: symbol={symbol}, side={side}, stop_price={stop_price}"
+        )
         return response['orderId']
 
     except ClientError as e:
@@ -111,13 +128,17 @@ def new_stop_order(symbol, side, stop_price) -> int:
             f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
         logging.error(
-            f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
+            f"new_stop_order, params: symbol={symbol}, side={side}, stop_price={stop_price}\n"
+            f"      Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
         send_telegram_message(message)
         return None
 
 
-def new_take_profit_order(symbol, side, quantity, take_price, take_price_trigger) ->  int:
+def new_take_profit_order(
+    symbol: str, side: str, quantity: float, 
+    take_price: float, take_price_trigger: float
+) ->  int | None:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -129,7 +150,11 @@ def new_take_profit_order(symbol, side, quantity, take_price, take_price_trigger
             reduceOnly=True,
             timeInForce='GTE_GTC'
         )
-        logging.info(response)
+        logging.info(
+            f"new_take_profit_order: GOOD! orderId: {response['orderId']}, "
+            f"params: symbol={symbol}, side={side}, quantity={quantity}, "
+            f"take_price={take_price}, take_price_trigger={take_price_trigger}"
+        )
         return response['orderId']
 
     except ClientError as e:
@@ -139,7 +164,9 @@ def new_take_profit_order(symbol, side, quantity, take_price, take_price_trigger
             f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
         logging.error(
-            f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
+            f"new_take_profit_order, params: symbol={symbol}, side={side}, quantity={quantity}, "
+            f"take_price={take_price}, take_price_trigger={take_price_trigger}\n"
+            f"      Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
         send_telegram_message(message)
         return None
@@ -157,14 +184,70 @@ def round_step_size(number: float, precision: float) -> float:
     return number
 
 
-def open_position(
-    symbol, side, price, user_data_ws: dict,
-    take_price_percentage = 0.01,
-    stop_price_percentage = 0.005,
-    position_size_in_dollars = 10,
-    order_market = False
-) -> dict:
+def monitor_postion(
+    symbol: str,
+    side: str,
+    average_price: float,
+    user_data_ws: dict,
+    ticker_list: dict,
+    position_order_id: int,
+    stop_order_id: int,
+    take_profit_order_id:int,
+    trailing_stop_percent: float
+) -> None:
+    trailing_stop_trigger_price = average_price * (1 + trailing_stop_percent) if side == 'BUY' else average_price * (1 - trailing_stop_percent)
+    stop_loss_adjusted = False
+    print(user_data_ws)
+    while True:
+        # Проверка на срабатывания стопа
+        if user_data_ws[stop_order_id]['order_status'] == 'FILLED':
+            logging.info(f"STOP LOSS! position_order_id: {position_order_id}")
+            break
 
+        # Проверка на срабатывания тейк профита 
+        elif user_data_ws[take_profit_order_id]['order_status'] == 'FILLED':
+            logging.info(f"TAKE PROFIT! position_order_id: {position_order_id}")
+            break
+
+        # Сдвиг стопа в б/у 
+        elif not stop_loss_adjusted:
+            if ticker_list[symbol] >= trailing_stop_trigger_price if side == 'BUY' else ticker_list[symbol] <= trailing_stop_trigger_price:
+                logging.warning(f"TRAILING STOP LOSS! position_order_id: {position_order_id}")
+                stop_loss_adjusted = True
+                try:
+                    client.cancel_order(symbol=symbol, orderId=stop_order_id)
+                    stop_price = round_step_size(
+                        average_price * (1.002 if side == 'BUY' else 0.998), 
+                        TRADE_FILTERS[symbol]['tickSize']
+                    )
+                    user_data_ws.pop(stop_order_id, None)
+                    stop_order_id = new_stop_order(symbol, side, stop_price)
+
+                except ClientError as e:
+                    logging.error(
+                        f"Cancel_order, position_order_id: {position_order_id}, "
+                        f"status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
+                    )
+        time.sleep(3)
+    user_data_ws.pop(position_order_id, None)
+    user_data_ws.pop(stop_order_id, None)
+    user_data_ws.pop(take_profit_order_id, None)
+    
+
+def open_position(
+    symbol: str, side: str, price: float, user_data_ws: dict,
+    ticker_list: dict,
+    is_breakout_strategy_enabled: bool,
+    take_price_percentage: float = 0.01,
+    stop_price_percentage: float = 0.005,
+    position_size_in_dollars: int = 10,
+    trailing_stop_percent: float = 0.01,
+    order_market = False
+) -> None:
+    if is_breakout_strategy_enabled:
+        side = 'BUY' if side == 'SELL' else 'SELL'
+    
+    price = round_step_size(price, TRADE_FILTERS[symbol]['tickSize'])
     quantity = round_step_size(
         position_size_in_dollars / price,
         TRADE_FILTERS[symbol]['stepSize']
@@ -174,15 +257,20 @@ def open_position(
     else:
         position_order_id = new_order_limit(symbol, side, quantity, price)
 
-    while True:
-        if position_order_id:
+    if position_order_id:
+        while True:
             if position_order_id in user_data_ws:
                 if user_data_ws[position_order_id]['order_status'] == 'FILLED':
                     average_price = user_data_ws[position_order_id]['average_price']
-                    time.sleep(1)
                     break
-        else:
-            return None
+
+                elif user_data_ws[position_order_id]['order_status'] == 'CANCELED' or 'EXPIRED':
+                    return None
+            time.sleep(0.5)
+
+    else:
+        return None
+
     stop_price = round_step_size(
         (average_price * ((1 - stop_price_percentage) if side == 'BUY' else (1 + stop_price_percentage))), 
         TRADE_FILTERS[symbol]['tickSize']
@@ -196,12 +284,40 @@ def open_position(
         TRADE_FILTERS[symbol]['tickSize']
     )
     take_profit_order_id = new_take_profit_order(symbol, side, quantity, take_price, take_price_trigger)
-    return {
-        'position_order_id' : position_order_id,
-        'stop_order_id' : stop_order_id,
-        'take_profit_order_id' : take_profit_order_id
-    }
+    print(f"position_order_id: {position_order_id}, stop_order_id{stop_order_id}, take_profit_order_id: {take_profit_order_id}")
+    monitor_postion(
+        symbol,
+        side,
+        average_price,
+        user_data_ws,
+        ticker_list,
+        position_order_id,
+        stop_order_id,
+        take_profit_order_id,
+        trailing_stop_percent,
+    )
+    
 
+# if __name__ == '__main__':
+#     from web_socket import BinanceWebsocketMarkPrice, BinanceWebsocketUserData
+    
+#     ws = BinanceWebsocketMarkPrice()
+#     ws.ticker_stream_start()
+#     ticker_list = ws.ticker_list
+
+#     user_data_ws = BinanceWebsocketUserData(client)
+#     user_data_ws.ticker_stream_start()
+#     last_order = user_data_ws.last_order
+#     time.sleep(10)
+#     open_position(
+#         symbol="MATICUSDT", side="BUY", price=0.7906, user_data_ws=user_data_ws.orders_user_data,
+#         ticker_list=ticker_list,
+#         take_price_percentage = 0.005,
+#         stop_price_percentage = 0.005,
+#         position_size_in_dollars = 10,
+#         trailing_stop_percent = 0.003,
+#         order_market = True
+#     )
 
 
 

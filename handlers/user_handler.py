@@ -6,9 +6,13 @@ from keyboards.user_kb import (
     main_kb, 
     cancel_kb, 
     del_order_kb, 
-    monitoring_kb
+    monitoring_kb,
     )
-from utils.states import NewNoticeState, DeleteNoticeState
+from utils.states import (
+    NewNoticeState, 
+    DeleteNoticeState,
+    ConficTradeState
+)
 from utils.validation import check_input_notice_data, string_to_list
 from utils.mongodb import (
     update_data_on_db,
@@ -20,8 +24,10 @@ from utils.mongodb import (
 from trading_bot import (
     ticker_list,
     list_working_orders,
-    last_order
+    last_order,
+    trading_cnfg
 )
+import json
 
 
 router = Router()
@@ -227,7 +233,7 @@ async def del_coin_handler(message: Message, state: FSMContext) -> None:
 
 
 @router.message(F.text == "Мониторинг")
-async def monitoring_handler(message: Message):
+async def monitoring_handler(message: Message) -> None:
     await message.answer("Что показать?", reply_markup=monitoring_kb)
 
 
@@ -242,7 +248,7 @@ async def monitoring_handler(message: Message):
 
 
 @router.message(F.text == "BinanceWebsocketUserData")
-async def monitoring_handler(message: Message):
+async def monitoring_handler(message: Message) -> None:
     if last_order:
         await message.answer(
             f"pair: {last_order['pair']}\n"
@@ -257,3 +263,43 @@ async def monitoring_handler(message: Message):
             "Нет данных",
             reply_markup=monitoring_kb
         )
+
+
+@router.message(F.text == "Config")
+async def config_handler(message: Message, state: FSMContext) -> None:
+    if message.from_user.id == ADMIN:
+        await state.set_state(ConficTradeState.start)
+        await message.answer(
+            f"\"breakout_strategy\" : {trading_cnfg.is_breakout_strategy_enabled},\n"
+            f"\"order_market\" : {trading_cnfg.order_market},\n"
+            f"\"position_size\" : {trading_cnfg.position_size_in_dollars},\n"
+            f"\"take_price\" : {trading_cnfg.take_price_percentage},\n"
+            f"\"stop_price\" : {trading_cnfg.stop_price_percentage},\n"
+            f"\"trailing_stop\" : {trading_cnfg.trailing_stop_percent}\n",
+            reply_markup=cancel_kb
+        )
+
+
+@router.message(ConficTradeState.start)
+async def recive_config_handler(message: Message, state: FSMContext) -> None:
+    await state.clear()
+    data_string: str = message.text
+    data_string = '{' + data_string + '}'
+    try:
+        cleaned_data_string = data_string.replace('\n', '')
+        data_dict = json.loads(cleaned_data_string)
+        with open('config.json', 'w') as json_file:
+            json.dump(data_dict, json_file)
+
+        trading_cnfg.is_breakout_strategy_enabled = data_dict['breakout_strategy']
+        trading_cnfg.order_market = data_dict['order_market']
+        trading_cnfg.position_size_in_dollars = data_dict['position_size']
+        trading_cnfg.take_price_percentage = data_dict['take_price']
+        trading_cnfg.stop_price_percentage = data_dict['stop_price']
+        trading_cnfg.trailing_stop_percent = data_dict['trailing_stop']
+        await message.reply("Принято!", reply_markup=main_kb)
+
+    except Exception as e:
+        error_message = f"Ошибка: {str(e)}"
+        await message.reply(error_message, reply_markup=main_kb)
+

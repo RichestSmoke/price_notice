@@ -6,6 +6,7 @@ import certifi, os
 import threading
 import traceback
 import time
+import logging
 
 
 class BinanceWebsocketMarkPrice:
@@ -33,13 +34,13 @@ class BinanceWebsocketMarkPrice:
                                 self.ticker_list[data_item['s']] = float(data_item['p'])
 
                         except Exception as e:
-                            print(f"Error processing message: {str(e)}")
+                            logging.error(f"BinanceWebsocketMarkPrice. Message: {str(e)}")
                             if str(e) != 'string indices must be integers':
                                 break
                             await asyncio.sleep(2)
 
-            except:
-                print("Connection closed")
+            except Exception as e:
+                logging.error(f"BinanceWebsocketMarkPrice: Connection closed! Message: {str(e)}")
                 await asyncio.sleep(10)
 
 
@@ -90,13 +91,13 @@ class BinanceWebsocketUserData:
                                 self.last_order.update(order_info)
 
                         except Exception as e:
-                            print(f"Error processing message: {str(e)}")
+                            logging.error(f"BinanceWebsocketUserData. Message: {str(e)}")
                             if str(e) != 'string indices must be integers':
                                 break
                             await asyncio.sleep(2)
 
             except:
-                print("Connection closed")
+                logging.error(f"BinanceWebsocketUserData: Connection closed! Message: {str(e)}")
                 print('Ошибка:\n', traceback.format_exc())
                 await asyncio.sleep(5)
 
