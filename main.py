@@ -10,9 +10,9 @@ import sys
 
 
 def main():
-    start_trading_bot()
+    # start_trading_bot()
     start_webhook()
-    # asyncio.run(start_poling())
+    asyncio.run(start_poling())
 
 if __name__ == '__main__':
     main()

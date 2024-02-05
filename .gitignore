@@ -3,3 +3,5 @@ __pycache__/
 .env
 111.py
 log_file.log
+*.csv
+candlestick_chart.jpg

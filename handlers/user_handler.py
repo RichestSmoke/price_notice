@@ -7,6 +7,7 @@ from keyboards.user_kb import (
     cancel_kb, 
     del_order_kb, 
     monitoring_kb,
+    add_order_or_pair_kb
     )
 from utils.states import (
     NewNoticeState, 
@@ -22,10 +23,13 @@ from utils.mongodb import (
     clear_entire_collection 
     )
 from trading_bot import (
-    ticker_list,
+    ticker_and_price_dict,
     list_working_orders,
     last_order,
-    trading_cnfg
+    trading_cnfg,
+    client,
+    update_trading_levels
+
 )
 import json
 
@@ -50,10 +54,24 @@ async def cancel_handler(message: Message, state: FSMContext):
     await message.answer("Главное меню", reply_markup=main_kb)
 
 
+@router.message(F.text == "Добавить ордер/торговую пару")
+async def add_order_or_pair_handler(message: Message, state: FSMContext):
+    if message.from_user.id == ADMIN:
+        await state.set_state(NewNoticeState.enter_data)
+        await message.answer(
+            "▪ Добавить один или несколько ордеров\n"
+            "▪ Добавить торговую пару для рассчета уровней",
+            reply_markup=add_order_or_pair_kb
+        )
+    else:
+        await message.answer("Нет доступа!", reply_markup=main_kb)
+
+
+
 @router.message(F.text == "Добавить ордер")
 async def new_notice(message: Message, state: FSMContext):
     if message.from_user.id == ADMIN:
-        await state.set_state(NewNoticeState.enter_data)
+        await state.set_state(NewNoticeState.add_order)
         await message.answer(
             "Введите уведомление в формате:\n"
             "❗️Цена должна быть со знаком .\n"
@@ -67,7 +85,7 @@ async def new_notice(message: Message, state: FSMContext):
     
 
 
-@router.message(NewNoticeState.enter_data)
+@router.message(NewNoticeState.add_order)
 async def writing_new_notice(message: Message, state: FSMContext):
     text_data_orders = string_to_list(message.text)
     new_orders_list = []
@@ -103,13 +121,55 @@ async def writing_new_notice(message: Message, state: FSMContext):
 
 
 
+@router.message(F.text == "Добавить торговую пару")
+async def add_trading_pair_handler(message: Message, state: FSMContext):
+    if message.from_user.id == ADMIN:
+        await state.set_state(NewNoticeState.add_pair)
+        await message.answer(
+            "Введите символ в формате:\n"
+            "BTCUSDT",
+            reply_markup=cancel_kb
+        )
+    else:
+        await message.answer("Нет доступа!", reply_markup=main_kb)
+
+
+
+@router.message(NewNoticeState.add_pair)
+async def writing_new_notice(message: Message, state: FSMContext):
+    symbol = message.text.upper()
+    if symbol in ticker_and_price_dict:
+        with open('trading_pair.json', 'r+') as file:
+            coins_list = json.load(file)
+            coins_list.append(symbol)
+            file.seek(0)
+            json.dump(coins_list, file)
+            file.truncate()
+        list_working_orders_copy = list_working_orders.copy()
+        new_orders = update_trading_levels(client, list_working_orders_copy, symbol)
+        db_result = await update_data_on_db(new_orders)
+        list_working_orders.extend(new_orders)
+        text = ""
+        for order in new_orders:
+            text += f"{order['coin']}  -  {order['price']}$ {order['action']}\n"
+        await message.reply(
+            f"{symbol} успешно сохранен, новые ордера:\n"
+            f"{text}"
+            f"db: {db_result}", 
+            reply_markup=main_kb)
+    else:
+        await message.reply(f"Пары {symbol} нет в словаре ticker_list", reply_markup=main_kb)
+    await state.clear()
+
+
+
 @router.message(F.text == "Посмотреть ордеры")
 async def show_notice(message: Message):
     notice_data = await show_data_in_db()
     answer_text = ""
     for order in notice_data:
         try:
-            delta_precent = ((order['price'] - ticker_list[order['coin']]) / ticker_list[order['coin']]) * 100
+            delta_precent = ((order['price'] - ticker_and_price_dict[order['coin']]) / ticker_and_price_dict[order['coin']]) * 100
             answer_text += (
                 f"{order['coin']} -- ${order['price']} {'⬇' if order['action'] == 'SELL' else '⬆'} "
                 f"{'🔴' if abs(delta_precent) <= 1 else ('🟠' if 1 < abs(delta_precent) < 7 else '🟢')} {round((delta_precent), 1)}%\n"
@@ -240,9 +300,9 @@ async def monitoring_handler(message: Message) -> None:
 @router.message(F.text == "BinanceWebsocketMarkPrice")
 async def monitoring_handler(message: Message):
     await message.answer(
-        f"BTCUSDT - ${ticker_list.get('BTCUSDT')}\n"
-        f"ETHUSDT - ${ticker_list.get('ETHUSDT')}\n"
-        f"SOLUSDT - ${ticker_list.get('SOLUSDT')}",
+        f"BTCUSDT - ${ticker_and_price_dict.get('BTCUSDT')}\n"
+        f"ETHUSDT - ${ticker_and_price_dict.get('ETHUSDT')}\n"
+        f"SOLUSDT - ${ticker_and_price_dict.get('SOLUSDT')}",
         reply_markup=monitoring_kb
     )
 

@@ -9,7 +9,7 @@ from aiogram.types import (
 main_kb = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text="Добавить ордер")
+            KeyboardButton(text="Добавить ордер/торговую пару")
         ],
         [
             KeyboardButton(text="Посмотреть ордеры"),
@@ -18,6 +18,22 @@ main_kb = ReplyKeyboardMarkup(
         [
             KeyboardButton(text="Мониторинг"),
             KeyboardButton(text="Config")
+        ]
+    ],
+    resize_keyboard=True
+)
+
+
+add_order_or_pair_kb = ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text="Добавить ордер"),
+        ],
+        [
+            KeyboardButton(text="Добавить торговую пару"),
+        ],
+        [
+            KeyboardButton(text="Отмена")
         ]
     ],
     resize_keyboard=True
