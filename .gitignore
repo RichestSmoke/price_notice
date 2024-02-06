@@ -5,3 +5,4 @@ __pycache__/
 log_file.log
 *.csv
 candlestick_chart.jpg
+loader copy.py

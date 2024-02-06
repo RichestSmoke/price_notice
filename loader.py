@@ -10,10 +10,16 @@ import logging
 import sys
 
 
-WEB_SERVER_HOST = "::"
-WEB_SERVER_PORT = 8443
+# WEB_SERVER_HOST = "::"
+EXTERNAL_PORT = 8443
 WEBHOOK_PATH = "/webhook"
-BASE_WEBHOOK_URL = "https://botrealestateod.alwaysdata.net"
+DOMAIN = 'realestatebot.cfd'
+DOMAIN = '9270-37-73-102-64.ngrok-free.app'
+BASE_WEBHOOK_URL = f"https://{DOMAIN}:{str(EXTERNAL_PORT)}"
+WEB_SERVER_HOST = "127.0.0.1"
+WEB_SERVER_PORT = 8080
+
+# BASE_WEBHOOK_URL = "https://botrealestateod.alwaysdata.net"
 # BASE_WEBHOOK_URL = "https://4699-188-115-145-71.ngrok.io"
 
 load_dotenv(find_dotenv())
