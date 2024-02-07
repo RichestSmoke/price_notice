@@ -1,1 +1,1 @@
-{"breakout_strategy": false, "order_market": true, "position_size": 20, "take_price": 0.02, "stop_price": 0.008, "trailing_stop": 0.0012}
+{"breakout_strategy": false, "order_market": true, "position_size": 20, "take_price": 0.02, "stop_price": 0.008, "trailing_stop": 0.012}

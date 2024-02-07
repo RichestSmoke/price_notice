@@ -67,10 +67,11 @@ del_order_kb = ReplyKeyboardMarkup(
 monitoring_kb = ReplyKeyboardMarkup(
     keyboard=[
         [
-            KeyboardButton(text="BinanceWebsocketMarkPrice")
+            KeyboardButton(text="WebsocketMarkPrice"),
+            KeyboardButton(text="WebsocketUserData")
         ],
         [
-            KeyboardButton(text="BinanceWebsocketUserData")
+            KeyboardButton(text="is_open_position_dict")
         ],
         [
             KeyboardButton(text="Отмена")

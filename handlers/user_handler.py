@@ -28,6 +28,7 @@ from trading_bot import (
     last_order,
     trading_cnfg,
     client,
+    is_open_position_dict,
     update_trading_levels
 
 )
@@ -138,10 +139,13 @@ async def add_trading_pair_handler(message: Message, state: FSMContext):
 @router.message(NewNoticeState.add_pair)
 async def writing_new_notice(message: Message, state: FSMContext):
     symbol = message.text.upper()
+    await state.clear()
     if symbol in ticker_and_price_dict:
         with open('trading_pair.json', 'r+') as file:
             coins_list = json.load(file)
             coins_list.append(symbol)
+            coins_list = tuple(coins_list)
+            coins_list = list(coins_list)
             file.seek(0)
             json.dump(coins_list, file)
             file.truncate()
@@ -159,7 +163,6 @@ async def writing_new_notice(message: Message, state: FSMContext):
             reply_markup=main_kb)
     else:
         await message.reply(f"Пары {symbol} нет в словаре ticker_list", reply_markup=main_kb)
-    await state.clear()
 
 
 
@@ -297,8 +300,8 @@ async def monitoring_handler(message: Message) -> None:
     await message.answer("Что показать?", reply_markup=monitoring_kb)
 
 
-@router.message(F.text == "BinanceWebsocketMarkPrice")
-async def monitoring_handler(message: Message):
+@router.message(F.text == "WebsocketMarkPrice")
+async def show_mark_price_handler(message: Message):
     await message.answer(
         f"BTCUSDT - ${ticker_and_price_dict.get('BTCUSDT')}\n"
         f"ETHUSDT - ${ticker_and_price_dict.get('ETHUSDT')}\n"
@@ -307,8 +310,8 @@ async def monitoring_handler(message: Message):
     )
 
 
-@router.message(F.text == "BinanceWebsocketUserData")
-async def monitoring_handler(message: Message) -> None:
+@router.message(F.text == "WebsocketUserData")
+async def show_user_data_handler(message: Message) -> None:
     if last_order:
         await message.answer(
             f"pair: {last_order['pair']}\n"
@@ -325,19 +328,35 @@ async def monitoring_handler(message: Message) -> None:
         )
 
 
+@router.message(F.text == "is_open_position_dict")
+async def is_open_position_handler(message: Message) -> None:
+    text_messge = ''
+    for symbol in is_open_position_dict.keys():
+        if is_open_position_dict[symbol]:
+            quantity_in_dollar = round(abs(is_open_position_dict[symbol]) * ticker_and_price_dict.get(symbol), 2)
+            side = 'BUY' if (is_open_position_dict[symbol] > 0) else 'SELL'
+            text_messge += f"{symbol} quantity: {is_open_position_dict[symbol]} = ${quantity_in_dollar} {side}\n"
+    if not text_messge:
+        text_messge = 'Нет открытых позиций!'
+    await message.answer(text_messge, reply_markup=main_kb)
+
+
 @router.message(F.text == "Config")
 async def config_handler(message: Message, state: FSMContext) -> None:
     if message.from_user.id == ADMIN:
         await state.set_state(ConficTradeState.start)
         await message.answer(
-            f"\"breakout_strategy\" : {trading_cnfg.is_breakout_strategy_enabled},\n"
-            f"\"order_market\" : {trading_cnfg.order_market},\n"
+            f"\"breakout_strategy\" : {str(trading_cnfg.is_breakout_strategy_enabled).lower()},\n"
+            f"\"order_market\" : {str(trading_cnfg.order_market).lower},\n"
             f"\"position_size\" : {trading_cnfg.position_size_in_dollars},\n"
             f"\"take_price\" : {trading_cnfg.take_price_percentage},\n"
             f"\"stop_price\" : {trading_cnfg.stop_price_percentage},\n"
             f"\"trailing_stop\" : {trading_cnfg.trailing_stop_percent}\n",
             reply_markup=cancel_kb
         )
+    else:
+        await message.answer("Нет доступа!", reply_markup=main_kb)
+
 
 
 @router.message(ConficTradeState.start)

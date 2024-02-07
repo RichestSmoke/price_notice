@@ -294,7 +294,7 @@ def open_position(
         )
         stop_order_id = new_stop_order(symbol, side, stop_price)
         multiplier = 1 if side == 'BUY' else -1
-        take_price = round_step_size(price * (1 + multiplier * take_price_percentage), TRADE_FILTERS[symbol]['tickSize'])
+        take_price = round_step_size(average_price * (1 + multiplier * take_price_percentage), TRADE_FILTERS[symbol]['tickSize'])
         take_price_trigger = round_step_size(
             (take_price - multiplier * (10 * TRADE_FILTERS[symbol]['tickSize'])),
             TRADE_FILTERS[symbol]['tickSize']
@@ -302,7 +302,7 @@ def open_position(
         take_profit_order_id = new_take_profit_order(symbol, side, quantity, take_price, take_price_trigger)
         logger.info(
             f"Entering the monitor_position: {symbol} - {price}$ {side}\n"
-            f"quantity: {quantity}, stop_price: {stop_price}, take_price: {take_price}, take_price_trigger: {take_price_trigger}\n"
+            f"quantity: {quantity}, average_price: {average_price}, stop_price: {stop_price}, take_price: {take_price}, take_price_trigger: {take_price_trigger}\n"
             f"position_order_id: {position_order_id}, stop_order_id: {stop_order_id}, take_profit_order_id: {take_profit_order_id}"
         )
         time.sleep(1.5)
@@ -320,7 +320,7 @@ def open_position(
         )
     except Exception as e:
         time.sleep(1)
-        logger.error(f"Eror open_position-Thread: {symbol} - {price}$ {side}\n{e}")
+        logger.error(f"💔 Eror open_position-Thread: {symbol} - {price}$ {side}\n{e}")
         logger.error(traceback.format_exc())
         send_telegram_message(f'💔 Eror open_position-Thread\n{symbol} - {price}$ {side}\n{e}\n')
         user_data_ws.pop(position_order_id, None)
@@ -329,7 +329,7 @@ def open_position(
         if is_open_position_dict[symbol]:
             send_telegram_message(f"Открытая позиция: {symbol} - {price}$ {side}, пробую закрыть...")
             logger.info(
-                f"Eror open_position-Thread: {symbol} - {price}$ {side}, "
+                f"Eror open_position-Thread[Block except]: {symbol} - {price}$ {side}, "
                 f"is_open_position_dict = {is_open_position_dict[symbol]}\n"
                 f"Open position, trying close position..."
             )
