@@ -138,7 +138,7 @@ def find_levels(df: pd.DataFrame):
     return (resistance_lvls, support_lvls)
 
 
-def plot_candlestick_chart(df: pd.DataFrame, resistance_lvls, support_lvls):
+def plot_candlestick_chart(df: pd.DataFrame, symbol, resistance_lvls, support_lvls):
     matplotlib.use('agg')
     plt.clf() 
     plt.plot(df['Time'], df['Close'], label='High')
@@ -147,7 +147,7 @@ def plot_candlestick_chart(df: pd.DataFrame, resistance_lvls, support_lvls):
     for level in support_lvls:
         plt.scatter(df['Time'].iloc[level['idx']], df['Low'].iloc[level['idx']], color='green', marker='o', label='Впадины')
 
-    plt.title('График закрытия с вершинами и впадинами')
+    plt.title(f'График закрытия {symbol} и уровни')
     plt.xlabel('Время')
     plt.ylabel('Цена')
     # форматирование шкалы даты 
@@ -172,7 +172,7 @@ def update_trading_levels(client: UMFutures, list_working_orders: list, symbol: 
     new_orders = []
     df = update_df_klines(client, symbol)
     resistance_lvls, support_lvls = find_levels(df)
-    plot_candlestick_chart(df, resistance_lvls, support_lvls)
+    plot_candlestick_chart(df, symbol, resistance_lvls, support_lvls)
     send_telegram_photo(symbol)
     existing_coin_prices = [order['price'] for order in list_working_orders if order['coin'] == symbol]
     for lvl in resistance_lvls:

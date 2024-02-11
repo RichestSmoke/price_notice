@@ -137,15 +137,18 @@ async def add_trading_pair_handler(message: Message, state: FSMContext):
 
 
 @router.message(NewNoticeState.add_pair)
-async def writing_new_notice(message: Message, state: FSMContext):
-    symbol = message.text.upper()
+async def process_add_trading_pair_handler(message: Message, state: FSMContext):
     await state.clear()
+    symbol = message.text.upper()
+    if not symbol.endswith('USDT'):
+        symbol += 'USDT'
     if symbol in ticker_and_price_dict:
         with open('trading_pair.json', 'r+') as file:
             coins_list = json.load(file)
-            coins_list.append(symbol)
-            coins_list = tuple(coins_list)
-            coins_list = list(coins_list)
+            coins_dict = {item: None for item in coins_list}
+            if symbol not in coins_dict:
+                coins_dict[symbol] = None
+            coins_list = list(coins_dict.keys())
             file.seek(0)
             json.dump(coins_list, file)
             file.truncate()
@@ -267,6 +270,13 @@ async def del_coin_handler(message: Message, state: FSMContext) -> None:
             list_working_orders.remove(order)
     result_db = await remove_data_for_coin(coin)
     message_text += f"Всего удалено {order_count} ордеров, db={result_db}"
+    with open('trading_pair.json', 'r+') as file:
+            coins_list: list = json.load(file)
+            if coin in coins_list:
+                coins_list.remove(coin)
+            file.seek(0)
+            json.dump(coins_list, file)
+            file.truncate()
     await state.clear()
     await message.answer(
         message_text,
@@ -347,7 +357,7 @@ async def config_handler(message: Message, state: FSMContext) -> None:
         await state.set_state(ConficTradeState.start)
         await message.answer(
             f"\"breakout_strategy\" : {str(trading_cnfg.is_breakout_strategy_enabled).lower()},\n"
-            f"\"order_market\" : {str(trading_cnfg.order_market).lower},\n"
+            f"\"order_market\" : {str(trading_cnfg.order_market).lower()},\n"
             f"\"position_size\" : {trading_cnfg.position_size_in_dollars},\n"
             f"\"take_price\" : {trading_cnfg.take_price_percentage},\n"
             f"\"stop_price\" : {trading_cnfg.stop_price_percentage},\n"

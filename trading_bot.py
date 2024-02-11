@@ -80,6 +80,7 @@ def start_update_trading_levels(list_working_orders: list):
 def run_scheduler(list_working_orders: list):
     try:
         # schedule.every(1).minute.do(start_update_trading_levels, list_working_orders)
+        schedule.every().day.at("08:00").do(start_update_trading_levels, list_working_orders)
         schedule.every().day.at("20:00").do(start_update_trading_levels, list_working_orders)
         while True:
             schedule.run_pending()
@@ -98,7 +99,7 @@ def compare_order_prices_with_tickers(ticker_and_price_dict: dict) -> None:
             if ticker_and_price_dict.get(order['coin']):
                 if (order['price'] * 0.9985) <= ticker_and_price_dict[order['coin']] <= (order['price'] * 1.0015):
                     if (order['coin'] not in is_open_position_dict) or (not is_open_position_dict[order['coin']]):
-                        text_message = f"{order['coin']} -- {order['action']} NOW! ${order['price']}"
+                        text_message = f"{order['coin']} - ${order['price']} {order['action']} NOW!"
                         send_telegram_message(text_message)
                         logger.info(f"Entering the open_position: {order['coin']} - {order['price']}$ {order['action']}")
                         thread_name = f"{order['coin']}-{order['price']}-{order['action']}-open_position-Thread"
