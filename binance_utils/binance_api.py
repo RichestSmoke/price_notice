@@ -1,6 +1,7 @@
 from binance.um_futures import UMFutures
 from binance.error import ClientError
 from dotenv import load_dotenv, find_dotenv
+from collections import deque
 from typing import Optional
 import requests
 import traceback
@@ -53,7 +54,7 @@ def get_filters_exchange_info() -> dict:
 TRADE_FILTERS = get_filters_exchange_info()
 
 
-def new_order_limit(symbol: str, side: str, quantity: float, price: float) -> Optional[int]:
+def new_order_limit(symbol: str, side: str, quantity: float, price: float, color_log="") -> Optional[int]:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -64,7 +65,7 @@ def new_order_limit(symbol: str, side: str, quantity: float, price: float) -> Op
             timeInForce='GTC'
         )
         logging.info(
-            f"new_order_limit: GOOD! orderId: {response['orderId']}, "
+            f"{color_log} new_order_limit: GOOD! orderId: {response['orderId']}, "
             f"params: symbol={symbol}, side={side}, quantity={quantity}, price={price}"
         )
         return response['orderId']
@@ -75,12 +76,12 @@ def new_order_limit(symbol: str, side: str, quantity: float, price: float) -> Op
             f"{symbol} - {side} - ${price}, quantity: {quantity}\n"
             f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
-        logging.error(message)
+        logging.error(color_log + ' ' + message)
         send_telegram_message(message)
         return None
 
 
-def new_order_market(symbol: str, side: str, quantity: float) -> Optional[int]:
+def new_order_market(symbol: str, side: str, quantity: float, color_log="") -> Optional[int]:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -89,7 +90,7 @@ def new_order_market(symbol: str, side: str, quantity: float) -> Optional[int]:
             quantity=quantity,
         )
         logging.info(
-            f"new_order_market: GOOD! orderId: {response['orderId']}, "
+            f"{color_log} new_order_market: GOOD! orderId: {response['orderId']}, "
             f"params: symbol={symbol}, side={side}, quantity={quantity}"
         )
         return response['orderId']
@@ -100,12 +101,12 @@ def new_order_market(symbol: str, side: str, quantity: float) -> Optional[int]:
             f"{symbol} - {side}, quantity: {quantity}\n"
             f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
-        logging.error(message)
+        logging.error(color_log + ' ' + message)
         send_telegram_message(message)
         return None
 
 
-def new_stop_order(symbol: str, side: str, stop_price: float) -> Optional[int]:
+def new_stop_order(symbol: str, side: str, stop_price: float, color_log="") -> Optional[int]:
     try:
         response = client.new_order(
             symbol=symbol,
@@ -116,7 +117,7 @@ def new_stop_order(symbol: str, side: str, stop_price: float) -> Optional[int]:
             timeInForce = 'GTE_GTC'
         )
         logging.info(
-            f"new_stop_order: GOOD! orderId: {response['orderId']}, "
+            f"{color_log} new_stop_order: GOOD! orderId: {response['orderId']}, "
             f"params: symbol={symbol}, side={side}, stop_price={stop_price}"
         )
         return response['orderId']
@@ -127,14 +128,14 @@ def new_stop_order(symbol: str, side: str, stop_price: float) -> Optional[int]:
             f"{symbol} - {side} - stop_price: ${stop_price}\n"
             f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
-        logging.error(message)
+        logging.error(color_log + ' ' + message)
         send_telegram_message(message)
         return None
 
 
 def new_take_profit_order(
     symbol: str, side: str, quantity: float, 
-    take_price: float, take_price_trigger: float
+    take_price: float, take_price_trigger: float, color_log=""
 ) ->  Optional[int]:
     try:
         response = client.new_order(
@@ -148,7 +149,7 @@ def new_take_profit_order(
             timeInForce='GTE_GTC'
         )
         logging.info(
-            f"new_take_profit_order: GOOD! orderId: {response['orderId']}, "
+            f"{color_log} new_take_profit_order: GOOD! orderId: {response['orderId']}, "
             f"params: symbol={symbol}, side={side}, quantity={quantity}, "
             f"take_price={take_price}, take_price_trigger={take_price_trigger}"
         )
@@ -157,10 +158,10 @@ def new_take_profit_order(
     except ClientError as e:
         message = (
             f"💔 Except new_take_profit_order\n"
-            f"{symbol} - {side} - quantity: {quantity}\ntake_price: ${take_price}, take_price_trigger: ${take_price_trigger}"
+            f"{symbol} - {side} - quantity: {quantity}\ntake_price: ${take_price}, take_price_trigger: ${take_price_trigger}\n"
             f"Found error. status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
         )
-        logging.error(message)
+        logging.error(color_log + ' ' + message)
         send_telegram_message(message)
         return None
 
@@ -187,7 +188,9 @@ def monitor_postion(
     position_order_id: int,
     stop_order_id: int,
     take_profit_order_id:int,
-    trailing_stop_percent: float
+    trailing_stop_percent: float,
+    color_log: str,
+    unique_colors: deque
 ) -> None:
     trailing_stop_trigger_price = average_price * (1 + trailing_stop_percent) if side == 'BUY' else average_price * (1 - trailing_stop_percent)
     stop_loss_adjusted = False
@@ -195,22 +198,22 @@ def monitor_postion(
     while True:
         # Проверка на срабатывания стопа
         if user_data_ws[stop_order_id]['order_status'] == 'FILLED':
-            logger_text = f"STOP LOSS! {symbol} - {price}$ {side}"
+            logger_text = f"{color_log} STOP LOSS! {symbol} - {price}$ {side}"
             break
 
         # Проверка на срабатывания тейк профита 
         elif user_data_ws[take_profit_order_id]['order_status'] == 'FILLED':
-            logger_text = f"TAKE PROFIT! {symbol} - {price}$ {side}"
+            logger_text = f"{color_log} TAKE PROFIT! {symbol} - {price}$ {side}"
             break
 
         elif (user_data_ws[take_profit_order_id]['order_status'] == 'EXPIRED') or (user_data_ws[stop_order_id]['order_status'] == 'EXPIRED'):
-            logger_text = f"(TAKE PROFIT or STOP LOSS) = EXPIRED! {symbol} - {price}$ {side}"
+            logger_text = f"{color_log} (TAKE PROFIT or STOP LOSS) = EXPIRED! {symbol} - {price}$ {side}"
             break
 
         # Сдвиг стопа в б/у 
         elif not stop_loss_adjusted:
             if ticker_and_price_dict[symbol] >= trailing_stop_trigger_price if side == 'BUY' else ticker_and_price_dict[symbol] <= trailing_stop_trigger_price:
-                logger.warning(f"TRAILING STOP LOSS! position_order_id: {position_order_id} / {symbol} - {price}$ {side}")
+                logger.warning(f"{color_log} TRAILING STOP LOSS! position_order_id: {position_order_id} / {symbol} - {price}$ {side}")
                 stop_loss_adjusted = True
                 try:
                     client.cancel_order(symbol=symbol, orderId=stop_order_id)
@@ -219,12 +222,12 @@ def monitor_postion(
                         TRADE_FILTERS[symbol]['tickSize']
                     )
                     user_data_ws.pop(stop_order_id, None)
-                    stop_order_id = new_stop_order(symbol, side, stop_price)
-                    logger.info(f"NEW STOP LOSS: {symbol} - {price}$ {side}; stop_price: {stop_price}, stop_order_id: {stop_order_id}")
+                    stop_order_id = new_stop_order(symbol, side, stop_price, color_log)
+                    logger.info(f"{color_log} NEW STOP LOSS: {symbol} - {price}$ {side}; stop_price: {stop_price}, stop_order_id: {stop_order_id}")
 
                 except ClientError as e:
                     logger.error(
-                        f"Cancel_order, position_order_id: {position_order_id} / {symbol} - {price}$ {side}, "
+                        f"{color_log} Cancel_order, position_order_id: {position_order_id} / {symbol} - {price}$ {side},\n"
                         f"status: {e.status_code}, error code: {e.error_code}, error message: {e.error_message}"
                     )
                     send_telegram_message(f'💔 Eror TRAILING STOP LOSS! {symbol} - {price}$ {side}, Проверь стоп лосс в позиции')
@@ -232,6 +235,7 @@ def monitor_postion(
         time.sleep(2)
     logger.info(logger_text)
     send_telegram_message(logger_text)
+    unique_colors.append(color_log)
     user_data_ws.pop(position_order_id, None)
     user_data_ws.pop(stop_order_id, None)
     user_data_ws.pop(take_profit_order_id, None)
@@ -242,12 +246,38 @@ def open_position(
     ticker_and_price_dict: dict,
     is_open_position_dict: dict,
     is_breakout_strategy_enabled: bool,
+    color_log: str,
+    unique_colors: deque,
     take_price_percentage: float = 0.01,
     stop_price_percentage: float = 0.005,
     position_size_in_dollars: int = 10,
     trailing_stop_percent: float = 0.01,
     order_market = False
 ) -> None:
+    def execute_close_trade():
+        send_telegram_message(f"Открытая позиция: {symbol} - {price}$ {side}, пробую закрыть...")
+        logger.info(
+            f"{color_log} Eror open_position-Thread[Block except]: {symbol} - {price}$ {side}, "
+            f"is_open_position_dict = {is_open_position_dict[symbol]}\n"
+            f"Open position, trying close position..."
+        )
+        close_position_order_id = new_order_market(
+            symbol=symbol,
+            side= 'BUY' if side == 'SELL' else 'SELL',
+            quantity=abs(is_open_position_dict[symbol]),
+            color_log=color_log
+        )
+        time.sleep(2)
+        if close_position_order_id:
+            send_telegram_message(f"Позиция закрыта! {symbol} - {price}$ {side}")
+            logger.info(f"{color_log} Позиция закрыта! {symbol} - {price}$ {side}")
+            user_data_ws.pop(close_position_order_id, None)
+            user_data_ws.pop()
+        else:
+            send_telegram_message(f"Ошибка при закрытии позиции, нужно закрыть вручную! {symbol} - {price}$ {side}")
+            logger.warning(f"{color_log} Error when closing a position, you need to close it manually! {symbol} - {price}$ {side}")
+
+    
     try:
         if is_breakout_strategy_enabled:
             side = 'BUY' if side == 'SELL' else 'SELL'
@@ -255,10 +285,11 @@ def open_position(
         price = round_step_size(price, TRADE_FILTERS[symbol]['tickSize'])
         if position_size_in_dollars < TRADE_FILTERS[symbol]['min_notional']:
             logger.info(
-                f"POSITION_SIZE_IN_DOLLARS < MIN_NOTIONAL - STOP OPEN_POSITION: {symbol} - {price}$ {side}\n"
+                f"{color_log} POSITION_SIZE_IN_DOLLARS < MIN_NOTIONAL - STOP OPEN_POSITION: {symbol} - {price}$ {side}\n"
                 f"POSITION_SIZE_IN_DOLLARS: {position_size_in_dollars}, MIN_NOTIONAL: {TRADE_FILTERS[symbol]['min_notional']}"
             )
             send_telegram_message(f"POSITION_SIZE_IN_DOLLARS < MIN_NOTIONAL - STOP OPEN_POSITION: {symbol} - {price}$ {side}")
+            unique_colors.append(color_log)
             return None
 
         quantity = round_step_size(
@@ -266,9 +297,9 @@ def open_position(
             TRADE_FILTERS[symbol]['stepSize']
         )
         if order_market:
-            position_order_id = new_order_market(symbol, side, quantity)
+            position_order_id = new_order_market(symbol, side, quantity, color_log)
         else:
-            position_order_id = new_order_limit(symbol, side, quantity, price)
+            position_order_id = new_order_limit(symbol, side, quantity, price, color_log)
         time.sleep(1)
         if position_order_id:
             while True:
@@ -278,30 +309,35 @@ def open_position(
                         break
 
                     elif user_data_ws[position_order_id]['order_status'] == 'CANCELED' or 'EXPIRED':
-                        logger.info(f"POSITION_ORDER_ID == 'CANCELED' or 'EXPIRED' - STOP OPEN_POSITION: {symbol} - {price}$ {side}, quantity: {quantity}")
+                        logger.info(f"{color_log} POSITION_ORDER_ID == 'CANCELED' or 'EXPIRED' - STOP OPEN_POSITION: {symbol} - {price}$ {side}, quantity: {quantity}")
                         send_telegram_message(f"POSITION_ORDER_ID == 'CANCELED' or 'EXPIRED' - STOP OPEN_POSITION: {symbol} - {price}$ {side}")
+                        user_data_ws.pop(position_order_id, None)
+                        if is_open_position_dict[symbol]:
+                            execute_close_trade()
+                        unique_colors.append(color_log)
                         return None
                 time.sleep(0.5)
 
         else:
-            logger.info(f"POSITION_ORDER_ID == NONE - STOP OPEN_POSITION: {symbol} - {price}$ {side}, quantity: {quantity}")
+            logger.info(f"{color_log} POSITION_ORDER_ID == NONE - STOP OPEN_POSITION: {symbol} - {price}$ {side}, quantity: {quantity}")
             send_telegram_message(f"POSITION_ORDER_ID == NONE - STOP OPEN_POSITION: {symbol} - {price}$ {side}")
+            unique_colors.append(color_log)
             return None
 
         stop_price = round_step_size(
             (average_price * ((1 - stop_price_percentage) if side == 'BUY' else (1 + stop_price_percentage))), 
             TRADE_FILTERS[symbol]['tickSize']
         )
-        stop_order_id = new_stop_order(symbol, side, stop_price)
+        stop_order_id = new_stop_order(symbol, side, stop_price, color_log)
         multiplier = 1 if side == 'BUY' else -1
         take_price = round_step_size(average_price * (1 + multiplier * take_price_percentage), TRADE_FILTERS[symbol]['tickSize'])
         take_price_trigger = round_step_size(
             (take_price - multiplier * (10 * TRADE_FILTERS[symbol]['tickSize'])),
             TRADE_FILTERS[symbol]['tickSize']
         )
-        take_profit_order_id = new_take_profit_order(symbol, side, quantity, take_price, take_price_trigger)
+        take_profit_order_id = new_take_profit_order(symbol, side, quantity, take_price, take_price_trigger, color_log)
         logger.info(
-            f"Entering the monitor_position: {symbol} - {price}$ {side}\n"
+            f"{color_log} Entering the monitor_position: {symbol} - {price}$ {side}\n"
             f"quantity: {quantity}, average_price: {average_price}, stop_price: {stop_price}, take_price: {take_price}, take_price_trigger: {take_price_trigger}\n"
             f"position_order_id: {position_order_id}, stop_order_id: {stop_order_id}, take_profit_order_id: {take_profit_order_id}"
         )
@@ -317,36 +353,22 @@ def open_position(
             stop_order_id=stop_order_id,
             take_profit_order_id=take_profit_order_id,
             trailing_stop_percent=trailing_stop_percent,
+            color_log=color_log,
+            unique_colors=unique_colors
         )
     except Exception as e:
         time.sleep(1)
-        logger.error(f"💔 Eror open_position-Thread: {symbol} - {price}$ {side}\n{e}")
-        logger.error(traceback.format_exc())
-        send_telegram_message(f'💔 Eror open_position-Thread\n{symbol} - {price}$ {side}\n{e}\n')
+        logger.error(f"{color_log}💔 Eror open_position-Thread: {symbol} - {price}$ {side}\n{e}")
+        logger.error(color_log + traceback.format_exc())
+        send_telegram_message(f"💔 Eror open_position-Thread\n{symbol} - {price}$ {side}\n{e}\n")
         user_data_ws.pop(position_order_id, None)
         user_data_ws.pop(stop_order_id, None)
         user_data_ws.pop(take_profit_order_id, None)
         if is_open_position_dict[symbol]:
-            send_telegram_message(f"Открытая позиция: {symbol} - {price}$ {side}, пробую закрыть...")
-            logger.info(
-                f"Eror open_position-Thread[Block except]: {symbol} - {price}$ {side}, "
-                f"is_open_position_dict = {is_open_position_dict[symbol]}\n"
-                f"Open position, trying close position..."
-            )
+            execute_close_trade()
+        unique_colors.append(color_log)
+        
 
-            close_position_order_id = new_order_market(
-                symbol=symbol,
-                side= 'BUY' if side == 'SELL' else 'SELL',
-                quantity=abs(is_open_position_dict[symbol])
-            )
-            time.sleep(2)
-            if close_position_order_id:
-                send_telegram_message(f'Позиция закрыта! {symbol} - {price}$ {side}')
-                logger.info(f'Позиция закрыта! {symbol} - {price}$ {side}')
-                user_data_ws.pop(close_position_order_id, None)
-            else:
-                send_telegram_message(f"Ошибка при закрытии позиции, нужно закрыть вручную! {symbol} - {price}$ {side}")
-                logger.warning(f"Error when closing a position, you need to close it manually! {symbol} - {price}$ {side}")
 
 
 

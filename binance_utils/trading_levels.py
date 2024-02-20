@@ -6,7 +6,7 @@ import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
 import requests
-import json
+import math
 import time
 import os
 import matplotlib
@@ -68,17 +68,31 @@ def get_df_klines_1_month(client: UMFutures, symbol: str):
 
 
 def update_df_klines(client: UMFutures, symbol: str) -> pd.DataFrame:
-    try:
-        df = pd.read_csv(f"binance_utils/data_frames_csv/{symbol}.csv")
-        end_time = datetime.strptime(df['Time'].iloc[-1], "%Y-%m-%d %H:%M:%S")
-        limit = ((datetime.utcnow() - end_time).total_seconds()) // (15 * 60)
-        new_data_df = get_historical_klines(client, symbol, limit=int(limit+1))
+    def process_concat_df(df: pd.DataFrame, new_data_df: pd.DataFrame):
         df['Time'] = pd.to_datetime(df['Time'])
         df = pd.concat([df, new_data_df], ignore_index=True)
         df = df.sort_values(by='Time')
         df = df.drop_duplicates(subset='Time', keep='last')
         df.reset_index(drop=True, inplace=True)
         df.to_csv(f"binance_utils/data_frames_csv/{symbol}.csv", index=False)
+        return df
+    
+    try:
+        df = pd.read_csv(f"binance_utils/data_frames_csv/{symbol}.csv")
+        end_time = datetime.strptime(df['Time'].iloc[-1], "%Y-%m-%d %H:%M:%S")
+        limit = ((datetime.utcnow() - end_time).total_seconds()) // (15 * 60)
+        if limit < 1500:
+            new_data_df = get_historical_klines(client, symbol, limit=int(limit+1))
+            df = process_concat_df(df, new_data_df)
+            return df
+        else:
+            number_iteration = math.ceil(limit / 1500)
+            for _ in range(number_iteration):
+                start_time = datetime.strptime(str(df['Time'].iloc[-1]), "%Y-%m-%d %H:%M:%S")
+                new_data_df = get_historical_klines(client, symbol, startTime=int(start_time.timestamp() * 1000))
+                df = process_concat_df(df, new_data_df)
+                time.sleep(2)
+            return df
 
     except FileNotFoundError:
         df = get_df_klines_1_month(client, symbol)
@@ -92,14 +106,14 @@ def find_levels(df: pd.DataFrame):
     maxima_indices, _ = find_peaks(
         x=df['Close_MA'], 
         height=df['Close'].iloc[-1],
-        distance=200,
+        distance=160,
         width=20,
     )
 
     minima_indices, _ = find_peaks(
         x=-df['Close_MA'], 
         height=-df['Close'].iloc[-1],
-        distance=200,
+        distance=160,
         width=20,
     )
 
@@ -139,14 +153,36 @@ def find_levels(df: pd.DataFrame):
 
 
 def plot_candlestick_chart(df: pd.DataFrame, symbol, resistance_lvls, support_lvls):
-    matplotlib.use('agg')
+    matplotlib.use('agg')   #MacOSX
+    plt.figure(figsize=(15, 6))
     plt.clf() 
-    plt.plot(df['Time'], df['Close'], label='High')
-    for level in resistance_lvls:
-        plt.scatter(df['Time'].iloc[level['idx']], df['High'].iloc[level['idx']], color='red', marker='o', label='Вершины')
-    for level in support_lvls:
-        plt.scatter(df['Time'].iloc[level['idx']], df['Low'].iloc[level['idx']], color='green', marker='o', label='Впадины')
+    plt.plot(df['Time'], df['Close'])
+    legend_list = ["Close"]
+    for i, level in enumerate(resistance_lvls, start=1):
+        plt.scatter(df['Time'].iloc[level['idx']], df['High'].iloc[level['idx']], color='red', marker='o', label=f'Resistance Level {i}')
+        plt.annotate(
+            f'R{i}', 
+            (df['Time'].iloc[level['idx']], 
+            df['High'].iloc[level['idx']]), 
+            textcoords="offset points", 
+            xytext=(0,10), ha='center'
+        )
+        legend_list.append(f"R{i}: {level['time'].strftime('%m-%d %H:%M')} UTC, ${level['price']}")
 
+    for i, level in enumerate(support_lvls, start=1):
+        plt.scatter(df['Time'].iloc[level['idx']], df['Low'].iloc[level['idx']], color='green', marker='o', label=f'Support Level {i}')
+        plt.annotate(
+            f'S{i}', 
+            (df['Time'].iloc[level['idx']], 
+            df['Low'].iloc[level['idx']]), 
+            textcoords="offset points", 
+            xytext=(0,-20), 
+            ha='center'
+        )
+        legend_list.append(f"S{i}: {level['time'].strftime('%m-%d %H:%M')} UTC, ${level['price']}")
+
+    # Добавляем описание в легенду
+    plt.legend(legend_list)
     plt.title(f'График закрытия {symbol} и уровни')
     plt.xlabel('Время')
     plt.ylabel('Цена')
@@ -157,6 +193,8 @@ def plot_candlestick_chart(df: pd.DataFrame, symbol, resistance_lvls, support_lv
     # добавление сетки цены
     plt.locator_params(axis='y', nbins=10)
     plt.grid(axis='y', linestyle='--', linewidth=0.5)
+    # настройка отступов
+    plt.subplots_adjust(left=0.07, right=0.95, top=0.92, bottom=0.08)
     plt.savefig("candlestick_chart.jpg")
     # plt.show()
 

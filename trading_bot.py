@@ -9,6 +9,7 @@ import threading
 import json
 from pprint import pprint
 import traceback
+from collections import deque
 import logging
 
 
@@ -48,6 +49,12 @@ user_data_ws.ticker_stream_start()
 is_open_position_dict = user_data_ws.is_open_position_dict
 last_order = user_data_ws.last_order
 list_working_orders = asyncio.run(show_data_in_db())
+
+unique_colors = deque([
+    "🔴", "🟠", "🟡", "🟢", "🔵", "🟣", "🟤", 
+    "⚫", "⚪", "🟥", "🟧", "🟨", "🟩", "🟦", 
+    "🟪", "🟫", "⬛", "⬜", "🔶", "🔷"
+])
 
 def start_update_trading_levels(list_working_orders: list):
     list_working_orders_copy = list_working_orders.copy()
@@ -98,10 +105,11 @@ def compare_order_prices_with_tickers(ticker_and_price_dict: dict) -> None:
         for order in list_working_orders_copy:
             if ticker_and_price_dict.get(order['coin']):
                 if (order['price'] * 0.9985) <= ticker_and_price_dict[order['coin']] <= (order['price'] * 1.0015):
+                    color_log = unique_colors.popleft()
                     if (order['coin'] not in is_open_position_dict) or (not is_open_position_dict[order['coin']]):
-                        text_message = f"{order['coin']} - ${order['price']} {order['action']} NOW!"
+                        text_message = f"{order['coin']} - ${order['price']} {'📈' if order['action'] == 'SELL' else '📉'} NOW!"
                         send_telegram_message(text_message)
-                        logger.info(f"Entering the open_position: {order['coin']} - {order['price']}$ {order['action']}")
+                        logger.info(f"{color_log} Entering the open_position: {order['coin']} - {order['price']}$ {order['action']}")
                         thread_name = f"{order['coin']}-{order['price']}-{order['action']}-open_position-Thread"
                         threading.Thread(
                             target=open_position, 
@@ -114,6 +122,8 @@ def compare_order_prices_with_tickers(ticker_and_price_dict: dict) -> None:
                                 'ticker_and_price_dict': ticker_and_price_dict,
                                 'is_open_position_dict' : is_open_position_dict,
                                 'is_breakout_strategy_enabled': trading_cnfg.is_breakout_strategy_enabled,
+                                'color_log' : color_log,
+                                'unique_colors' : unique_colors,
                                 'take_price_percentage': trading_cnfg.take_price_percentage,
                                 'stop_price_percentage': trading_cnfg.stop_price_percentage,
                                 'position_size_in_dollars': trading_cnfg.position_size_in_dollars,
@@ -127,7 +137,8 @@ def compare_order_prices_with_tickers(ticker_and_price_dict: dict) -> None:
                             f"is_open_position_dict: {is_open_position_dict[order['coin']]}"
                         )
                         send_telegram_message(text_message)
-                        logger.warning(text_message)
+                        logger.warning(f"{color_log} {text_message}")
+                        unique_colors.append(color_log)
 
                     asyncio.run(remove_object_from_coin(
                         coin=order['coin'],
