@@ -255,27 +255,29 @@ def open_position(
     order_market = False
 ) -> None:
     def execute_close_trade():
-        send_telegram_message(f"Открытая позиция: {symbol} - {price}$ {side}, пробую закрыть...")
-        logger.info(
-            f"{color_log} Eror open_position-Thread[Block except]: {symbol} - {price}$ {side}, "
-            f"is_open_position_dict = {is_open_position_dict[symbol]}\n"
-            f"Open position, trying close position..."
-        )
-        close_position_order_id = new_order_market(
-            symbol=symbol,
-            side= 'BUY' if side == 'SELL' else 'SELL',
-            quantity=abs(is_open_position_dict[symbol]),
-            color_log=color_log
-        )
-        time.sleep(2)
-        if close_position_order_id:
-            send_telegram_message(f"Позиция закрыта! {symbol} - {price}$ {side}")
-            logger.info(f"{color_log} Позиция закрыта! {symbol} - {price}$ {side}")
-            user_data_ws.pop(close_position_order_id, None)
-            user_data_ws.pop()
-        else:
-            send_telegram_message(f"Ошибка при закрытии позиции, нужно закрыть вручную! {symbol} - {price}$ {side}")
-            logger.warning(f"{color_log} Error when closing a position, you need to close it manually! {symbol} - {price}$ {side}")
+        time.sleep(1.5)
+        if is_open_position_dict.get(symbol):
+            send_telegram_message(f"Открытая позиция: {symbol} - {price}$ {side}, пробую закрыть...")
+            logger.info(
+                f"{color_log} Eror open_position-Thread[Block except]: {symbol} - {price}$ {side}, "
+                f"is_open_position_dict = {is_open_position_dict[symbol]}\n"
+                f"Open position, trying close position..."
+            )
+            close_position_order_id = new_order_market(
+                symbol=symbol,
+                side= 'BUY' if side == 'SELL' else 'SELL',
+                quantity=abs(is_open_position_dict[symbol]),
+                color_log=color_log
+            )
+            time.sleep(2)
+            if close_position_order_id:
+                send_telegram_message(f"Позиция закрыта! {symbol} - {price}$ {side}")
+                logger.info(f"{color_log} Позиция закрыта! {symbol} - {price}$ {side}")
+                user_data_ws.pop(close_position_order_id, None)
+                user_data_ws.pop()
+            else:
+                send_telegram_message(f"Ошибка при закрытии позиции, нужно закрыть вручную! {symbol} - {price}$ {side}")
+                logger.warning(f"{color_log} Error when closing a position, you need to close it manually! {symbol} - {price}$ {side}")
 
     
     try:
@@ -312,8 +314,7 @@ def open_position(
                         logger.info(f"{color_log} POSITION_ORDER_ID == 'CANCELED' or 'EXPIRED' - STOP OPEN_POSITION: {symbol} - {price}$ {side}, quantity: {quantity}")
                         send_telegram_message(f"POSITION_ORDER_ID == 'CANCELED' or 'EXPIRED' - STOP OPEN_POSITION: {symbol} - {price}$ {side}")
                         user_data_ws.pop(position_order_id, None)
-                        if is_open_position_dict[symbol]:
-                            execute_close_trade()
+                        execute_close_trade()
                         unique_colors.append(color_log)
                         return None
                 time.sleep(0.5)
@@ -364,8 +365,7 @@ def open_position(
         user_data_ws.pop(position_order_id, None)
         user_data_ws.pop(stop_order_id, None)
         user_data_ws.pop(take_profit_order_id, None)
-        if is_open_position_dict[symbol]:
-            execute_close_trade()
+        execute_close_trade()
         unique_colors.append(color_log)
         
 
