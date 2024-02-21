@@ -198,22 +198,27 @@ def monitor_postion(
     while True:
         # Проверка на срабатывания стопа
         if user_data_ws[stop_order_id]['order_status'] == 'FILLED':
-            logger_text = f"{color_log} STOP LOSS! {symbol} - {price}$ {side}"
+            logger_text = f"STOP LOSS! {symbol} - {price}$ {side}"
+            tg_color = '🔴' if stop_loss_adjusted else '🟠'
             break
-
+        
         # Проверка на срабатывания тейк профита 
         elif user_data_ws[take_profit_order_id]['order_status'] == 'FILLED':
-            logger_text = f"{color_log} TAKE PROFIT! {symbol} - {price}$ {side}"
+            logger_text = f"TAKE PROFIT! {symbol} - {price}$ {side}"
+            tg_color = '🟢'
             break
 
         elif (user_data_ws[take_profit_order_id]['order_status'] == 'EXPIRED') or (user_data_ws[stop_order_id]['order_status'] == 'EXPIRED'):
-            logger_text = f"{color_log} (TAKE PROFIT or STOP LOSS) = EXPIRED! {symbol} - {price}$ {side}"
+            logger_text = f"(TAKE PROFIT or STOP LOSS) = EXPIRED! {symbol} - {price}$ {side}"
+            logger_text += f"\norder_status_TP: {user_data_ws[take_profit_order_id]['order_status']}, "
+            logger_text += f"order_status_SL: {user_data_ws[stop_order_id]['order_status']}"
+            tg_color = '⚫'
             break
 
         # Сдвиг стопа в б/у 
         elif not stop_loss_adjusted:
             if ticker_and_price_dict[symbol] >= trailing_stop_trigger_price if side == 'BUY' else ticker_and_price_dict[symbol] <= trailing_stop_trigger_price:
-                logger.warning(f"{color_log} TRAILING STOP LOSS! position_order_id: {position_order_id} / {symbol} - {price}$ {side}")
+                logger.info(f"{color_log} TRAILING STOP LOSS! position_order_id: {position_order_id} / {symbol} - {price}$ {side}")
                 stop_loss_adjusted = True
                 try:
                     client.cancel_order(symbol=symbol, orderId=stop_order_id)
@@ -234,7 +239,7 @@ def monitor_postion(
 
         time.sleep(2)
     logger.info(logger_text)
-    send_telegram_message(logger_text)
+    send_telegram_message(f"{tg_color} {logger_text}")
     unique_colors.append(color_log)
     user_data_ws.pop(position_order_id, None)
     user_data_ws.pop(stop_order_id, None)
@@ -311,7 +316,10 @@ def open_position(
                         break
 
                     elif user_data_ws[position_order_id]['order_status'] == 'CANCELED' or 'EXPIRED':
-                        logger.info(f"{color_log} POSITION_ORDER_ID == 'CANCELED' or 'EXPIRED' - STOP OPEN_POSITION: {symbol} - {price}$ {side}, quantity: {quantity}")
+                        logger.info(
+                            f"{color_log} POSITION_ORDER_ID == 'CANCELED' or 'EXPIRED' - STOP OPEN_POSITION: {symbol} - {price}$ {side}, \n"
+                            f"quantity: {quantity}, order_status: {user_data_ws[position_order_id]['order_status']}"
+                        )
                         send_telegram_message(f"POSITION_ORDER_ID == 'CANCELED' or 'EXPIRED' - STOP OPEN_POSITION: {symbol} - {price}$ {side}")
                         user_data_ws.pop(position_order_id, None)
                         execute_close_trade()
